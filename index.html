@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="口红质检员批次色差检测实验，包含教学、练习与20次正式检测。"
+    />
+    <meta name="theme-color" content="#7f1734" />
+    <title>口红质检员 | 批次色差检测</title>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%237f1734'/%3E%3Cpath d='M22 44V22l10-8 10 8v22z' fill='%23f7efe9'/%3E%3Cpath d='M26 37h12' stroke='%237f1734' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#workspace" aria-label="返回质检工作台">
+        <span class="brand-mark" aria-hidden="true">QC</span>
+        <span>
+          <strong>臻色制造 · 质量中心</strong>
+          <small>灌装线 L3 · 视觉复核工位</small>
+        </span>
+      </a>
+      <div class="device-status" role="status" aria-live="polite">
+        <span class="status-light" aria-hidden="true"></span>
+        <span>D65 模拟光源已就绪</span>
+        <span class="status-divider" aria-hidden="true"></span>
+        <span id="clock">--:--:--</span>
+      </div>
+    </header>
+
+    <main id="workspace" class="workspace">
+      <aside class="control-panel" aria-labelledby="task-title">
+        <div class="eyebrow" id="phase-label">班前任务简报</div>
+        <h1 id="task-title">判断这批口红能不能放行</h1>
+        <p class="task-copy">
+          左边是标准颜色，右边是刚生产的口红。右边明显更暗就拦下；只有轻微差别就放行。
+        </p>
+
+        <section class="metadata" aria-label="当前批次信息">
+          <div>
+            <span>批次编号</span>
+            <strong id="batch-id">RB-2609-01</strong>
+          </div>
+          <div>
+            <span>标准色号</span>
+            <strong id="shade-code">M-07 莓果绒</strong>
+          </div>
+          <div>
+            <span>生产工单</span>
+            <strong id="work-order">WO-2609-184</strong>
+          </div>
+          <div>
+            <span>检验条件</span>
+            <strong>D65 · 中性灰背景</strong>
+          </div>
+        </section>
+
+        <section class="settings" aria-labelledby="settings-title">
+          <div class="section-heading">
+            <h2 id="settings-title">训练设置</h2>
+            <span id="settings-status">开始前可调整</span>
+          </div>
+
+          <fieldset class="developer-setting">
+            <legend>样本类型</legend>
+            <div class="segmented-control" data-control="sample-type">
+              <button type="button" class="segment is-active" data-value="normal" aria-pressed="true">
+                正常样本
+              </button>
+              <button type="button" class="segment" data-value="abnormal" aria-pressed="false">
+                异常偏暗
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>检测难度</legend>
+            <div class="segmented-control three-up" data-control="difficulty">
+              <button type="button" class="segment" data-value="easy" aria-pressed="false">容易</button>
+              <button type="button" class="segment is-active" data-value="medium" aria-pressed="true">中等</button>
+              <button type="button" class="segment" data-value="hard" aria-pressed="false">困难</button>
+            </div>
+            <label class="difficulty-slider-label" for="difficulty-slider"><span>连续调节 d′</span><output id="difficulty-slider-value">1.2</output></label>
+            <input id="difficulty-slider" class="difficulty-slider" type="range" min="0.5" max="3" step="0.1" value="1.2" />
+          </fieldset>
+
+          <button id="regenerate" class="primary-button developer-setting" type="button">
+            <span aria-hidden="true">↻</span>
+            重新生成试色
+          </button>
+        </section>
+
+        <div class="model-note">
+          <span>当前模型分离度</span>
+          <strong id="model-dprime">d′ = 1.2</strong>
+          <p>这是刺激生成参数，不是参与者的测量结果。</p>
+        </div>
+      </aside>
+
+      <section class="inspection-deck" aria-labelledby="comparison-title">
+        <div class="deck-header">
+          <div>
+            <div class="eyebrow">D65 标准光源箱 · 屏幕模拟</div>
+            <h2 id="comparison-title">留样卡与线上抽样对照</h2>
+          </div>
+          <div class="sample-sequence" aria-label="当前进度">
+            <span id="mode-label">教学模式</span>
+            <strong>样本 <span id="sample-number">0000</span></strong>
+          </div>
+        </div>
+
+        <div class="comparison-stage">
+          <article class="swatch-station">
+            <div class="station-label">
+              <span>A</span>
+              <div>
+                <strong>批准留样</strong>
+                <small>标准批封样卡</small>
+              </div>
+            </div>
+            <div class="canvas-shell">
+              <canvas id="reference-canvas" width="520" height="520" aria-label="标准口红试色色块"></canvas>
+              <span class="corner-mark top-left" aria-hidden="true"></span>
+              <span class="corner-mark bottom-right" aria-hidden="true"></span>
+            </div>
+          </article>
+
+          <div class="comparison-axis" aria-hidden="true">
+            <span></span>
+            <em>VS</em>
+            <span></span>
+          </div>
+
+          <article class="swatch-station">
+            <div class="station-label">
+              <span>B</span>
+              <div>
+                <strong>线上抽样</strong>
+                <small>当前批次随机取样</small>
+              </div>
+            </div>
+            <div class="canvas-shell">
+              <canvas id="sample-canvas" width="520" height="520" aria-label="待检口红试色色块"></canvas>
+              <div class="sample-mask is-visible" id="sample-mask" aria-live="polite">
+                <span id="mask-kicker">准备开始</span>
+                <strong id="mask-message">阅读教学说明</strong>
+              </div>
+              <span class="corner-mark top-left" aria-hidden="true"></span>
+              <span class="corner-mark bottom-right" aria-hidden="true"></span>
+            </div>
+          </article>
+        </div>
+
+        <div class="observation-strip">
+          <div>
+            <span class="observation-label">观察状态</span>
+            <strong id="preview-status">等待开始</strong>
+          </div>
+          <div class="progress-track" id="progress-track" aria-label="实验进度">
+            <span id="progress-fill" style="width: 0%"></span>
+          </div>
+          <span id="progress-count">0 / 20</span>
+        </div>
+      </section>
+
+      <aside class="decision-panel" aria-labelledby="decision-title">
+        <div>
+          <div class="eyebrow">质检判定</div>
+          <h2 id="decision-title">签发单件检验结论</h2>
+          <p id="decision-instruction">观察结束后才能提交判断。练习会显示答案，正式检测不会即时反馈。</p>
+        </div>
+
+        <div class="decision-buttons" role="group" aria-label="样本判断">
+          <button type="button" class="decision-button normal" data-answer="normal">
+            <span class="decision-icon" aria-hidden="true">✓</span>
+            <span>
+              <strong>在容差内 · 放行</strong>
+              <small>继续本批次抽检</small>
+            </span>
+          </button>
+          <button type="button" class="decision-button abnormal" data-answer="abnormal">
+            <span class="decision-icon" aria-hidden="true">!</span>
+            <span>
+              <strong>疑似偏暗 · 拦截</strong>
+              <small>送仪器复测并暂缓放行</small>
+            </span>
+          </button>
+        </div>
+
+        <section class="preview-result" aria-live="polite" aria-labelledby="preview-result-title">
+          <span id="feedback-label">操作提示</span>
+          <h3 id="preview-result-title">请先阅读教学说明</h3>
+          <p id="preview-result-copy">完成 4 次练习后，将进入 20 次正式检测。</p>
+        </section>
+
+        <button id="next-practice" class="primary-button is-hidden" type="button">下一次练习</button>
+        <button id="restart-session" class="text-button" type="button">重新开始实验</button>
+
+        <dl class="spec-list">
+          <div>
+            <dt>正式试次</dt>
+            <dd>20 次</dd>
+          </div>
+          <div>
+            <dt>异常比例</dt>
+            <dd>50%</dd>
+          </div>
+          <div>
+            <dt>观察时长</dt>
+            <dd>1500 ms</dd>
+          </div>
+        </dl>
+      </aside>
+    </main>
+
+    <footer>
+      <span>视觉复核训练系统 · 信号检测论教学版</span>
+      <span>屏幕模拟不代替真实分光测色与标准光源箱</span>
+    </footer>
+
+    <section class="flow-overlay is-visible" id="intro-overlay" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+      <div class="flow-card intro-card">
+        <div class="flow-step">L3 灌装线 · 班前任务简报</div>
+        <h2 id="intro-title">请检查这20支口红，判断能不能放行</h2>
+        <p class="flow-lead">你是口红厂的质检员。每次左边会显示合格的标准颜色，右边会显示一支刚生产的口红。如果右边明显更暗，就把它拦下来复检；如果只是有一点点正常色差，就让它通过。</p>
+
+        <div class="scenario-switcher" role="group" aria-label="质检任务情景">
+          <button type="button" class="scenario-option is-active" data-scenario="routine" aria-pressed="true"><strong>普通生产批次</strong><span>正常的日常检查</span></button>
+          <button type="button" class="scenario-option" data-scenario="launch" aria-pressed="false"><strong>新品第一批</strong><span>异常少，但漏检影响大</span></button>
+          <button type="button" class="scenario-option" data-scenario="rework" aria-pressed="false"><strong>投诉后返工批</strong><span>异常多，而且不能再次漏检</span></button>
+        </div>
+
+        <div class="mission-context" aria-label="任务现场信息">
+          <div><span>你在检查什么</span><strong id="scenario-source">生产线随机抽出的20支口红</strong></div>
+          <div><span>怎么看</span><strong id="scenario-environment">在标准白光下和合格颜色对比</strong></div>
+          <div><span>判断错了会怎样</span><strong id="scenario-consequence">放过偏暗口红可能引起投诉；拦错正常口红会增加复检时间</strong></div>
+        </div>
+
+        <p class="briefing-note"><strong>现在不用理解 d′ 或 c。</strong>先凭观察完成判断，做完以后系统会结合你的结果解释这些指标。</p>
+
+        <div class="lesson-examples">
+          <article>
+            <canvas id="tutorial-normal" width="320" height="220" aria-label="正常样本教学示例"></canvas>
+            <div><strong>可放行样本</strong><span>允许范围内的轻微工艺波动</span></div>
+          </article>
+          <article>
+            <canvas id="tutorial-abnormal" width="320" height="220" aria-label="异常偏暗教学示例"></canvas>
+            <div><strong>应拦截样本</strong><span>整体明度明显低于批准留样</span></div>
+          </article>
+        </div>
+
+        <ol class="lesson-rules">
+          <li><span>01</span>每支样本在比色舱内显示 1500 ms，模拟生产节拍下的快速复核。</li>
+          <li><span>02</span>样本移出视野后签发“放行”或“拦截”，结论提交后不可修改。</li>
+          <li><span>03</span>4 次带反馈培训合格后，进入 20 次不反馈的正式抽检。</li>
+        </ol>
+
+        <div class="intro-actions">
+          <label for="intro-difficulty">本轮刺激分离度 <output id="intro-difficulty-value">d′ 1.2</output></label>
+          <input id="intro-difficulty" type="range" min="0.5" max="3" step="0.1" value="1.2" />
+          <button id="start-practice" class="flow-primary" type="button">进入工位培训 · 4 次</button>
+        </div>
+        <p class="controlled-sample-note">为了方便比较结果，正式实验固定包含10个正常样本和10个偏暗样本。三种情景只改变工作背景和判断失误的后果。</p>
+      </div>
+    </section>
+
+    <section class="flow-overlay" id="message-overlay" role="dialog" aria-modal="true" aria-labelledby="message-title">
+      <div class="flow-card message-card">
+        <div class="flow-step" id="message-kicker">练习完成</div>
+        <h2 id="message-title">准备进入正式检测</h2>
+        <p id="message-copy">正式检测共 20 次，不会即时显示答案。</p>
+        <dl class="session-summary" id="session-summary"></dl>
+        <button id="message-action" class="flow-primary" type="button">开始正式检测</button>
+      </div>
+    </section>
+
+    <section class="flow-overlay" id="pause-overlay" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+      <div class="flow-card message-card">
+        <div class="flow-step">检测已暂停</div>
+        <h2 id="pause-title">当前样本需要重新观察</h2>
+        <p>页面在计时阶段失去焦点，本次未记录。重新播放后会从 500 ms 准备阶段开始。</p>
+        <button id="replay-trial" class="flow-primary" type="button">重新播放当前样本</button>
+      </div>
+    </section>
+
+    <section class="report-overlay" id="report-overlay" role="dialog" aria-modal="true" aria-labelledby="report-title">
+      <article class="report-sheet">
+        <header class="report-header">
+          <div>
+            <div class="flow-step">本轮质检报告</div>
+            <h2 id="report-title">批次色差检测结果</h2>
+            <p>本报告基于当前 20 次正式作答，仅描述本轮表现，不代表稳定能力。</p>
+          </div>
+          <div class="report-stamp">
+            <span>有效记录</span>
+            <strong id="report-valid-count">20 / 20</strong>
+          </div>
+        </header>
+
+        <section class="metric-grid" aria-label="五项核心指标">
+          <article><span>命中率</span><strong id="metric-hit-rate">--</strong><small>异常样本判断为异常</small></article>
+          <article><span>虚报率</span><strong id="metric-fa-rate">--</strong><small>正常样本误判为异常</small></article>
+          <article><span>准确率</span><strong id="metric-accuracy">--</strong><small>全部正确判断比例</small></article>
+          <article class="metric-primary"><span>玩家估计 d′</span><strong id="metric-dprime">--</strong><small>本轮辨别表现</small></article>
+          <article><span>判断标准 c</span><strong id="metric-criterion">--</strong><small id="criterion-direction">--</small></article>
+        </section>
+
+        <div class="report-body">
+          <section class="report-section" aria-labelledby="matrix-title">
+            <div class="report-section-heading">
+              <div><span>01</span><h3 id="matrix-title">四类判断结果</h3></div>
+              <small>总计 20 次</small>
+            </div>
+            <div class="confusion-matrix" role="table" aria-label="信号检测四格结果表">
+              <div class="matrix-corner" role="columnheader">真实类别 →<br />参与者回答 ↓</div>
+              <div role="columnheader">异常偏暗</div>
+              <div role="columnheader">色差正常</div>
+              <div role="rowheader">判断异常</div>
+              <div class="matrix-value hit" role="cell"><span>H 命中</span><strong id="count-hit">--</strong></div>
+              <div class="matrix-value false-alarm" role="cell"><span>FA 虚报</span><strong id="count-fa">--</strong></div>
+              <div role="rowheader">判断正常</div>
+              <div class="matrix-value miss" role="cell"><span>M 漏报</span><strong id="count-miss">--</strong></div>
+              <div class="matrix-value correct-rejection" role="cell"><span>CR 正确拒绝</span><strong id="count-cr">--</strong></div>
+            </div>
+          </section>
+
+          <section class="report-section interpretation" aria-labelledby="interpretation-title">
+            <div class="report-section-heading">
+              <div><span>02</span><h3 id="interpretation-title">本轮解释</h3></div>
+            </div>
+            <p id="sensitivity-copy">正在生成辨别表现解释。</p>
+            <p id="criterion-copy">正在生成判断倾向解释。</p>
+            <div class="accuracy-callout">
+              <strong>为什么准确率不够？</strong>
+              <p id="accuracy-copy">准确率会把性质不同的漏检与误拦合并。在真实质检中，两种错误造成的后果并不相同。</p>
+            </div>
+            <p class="method-note"><strong>校正说明：</strong>d′ 与 c 使用 log-linear 校正率，命中率为 (H+0.5)/(异常数+1)，虚报率为 (FA+0.5)/(正常数+1)，避免全对或全选同一答案时出现无穷值。</p>
+          </section>
+        </div>
+
+        <section class="report-section distribution-lab" aria-labelledby="distribution-title">
+          <div class="report-section-heading">
+            <div><span>03</span><h3 id="distribution-title">把你的结果放回两类分布</h3></div>
+            <button id="restore-observed" class="compact-button" type="button">回到我的结果</button>
+          </div>
+          <p class="distribution-intro">拖动参数观察：d′ 改变正常与偏暗样本的可分辨距离；c 只移动你的判定标准，不会让样本本身变得更容易。</p>
+          <div class="distribution-layout">
+            <div class="distribution-controls">
+              <label for="viz-dprime">
+                <span>敏感性 d′</span>
+                <output id="viz-dprime-value">--</output>
+              </label>
+              <input id="viz-dprime" type="range" min="-1.5" max="3.5" step="0.05" value="1.2" />
+              <small>绝对值离 0 越远，分布重叠越少；负值表示本轮判断方向低于随机水平。</small>
+              <label for="viz-criterion">
+                <span>判断标准 c</span>
+                <output id="viz-criterion-value">--</output>
+              </label>
+              <input id="viz-criterion" type="range" min="-1.5" max="1.5" step="0.05" value="0" />
+              <small>向左更容易拦截，向右更容易放行。</small>
+              <div class="predicted-rates" aria-live="polite">
+                <div><span>预计命中</span><strong id="viz-hit-rate">--</strong></div>
+                <div><span>预计虚报</span><strong id="viz-fa-rate">--</strong></div>
+              </div>
+            </div>
+            <div class="distribution-figure">
+              <canvas id="distribution-canvas" width="1000" height="360" aria-label="正常样本与异常样本的信号检测分布图"></canvas>
+              <div class="distribution-legend" aria-hidden="true"><span class="legend-normal">正常样本</span><span class="legend-abnormal">偏暗样本</span><span class="legend-criterion">判定标准</span></div>
+            </div>
+          </div>
+        </section>
+
+        <div class="advanced-lab-grid">
+          <section class="report-section roc-lab" aria-labelledby="roc-title">
+            <div class="report-section-heading">
+              <div><span>04</span><h3 id="roc-title">ROC：标准改变，能力不变</h3></div>
+              <strong class="auc-badge">AUC <span id="roc-auc">--</span></strong>
+            </div>
+            <p class="distribution-intro">ROC曲线由当前 d′ 决定；拖动上方 c 时，工作点只会沿同一条曲线移动。</p>
+            <canvas id="roc-canvas" width="620" height="420" aria-label="接收者操作特征曲线"></canvas>
+            <div class="roc-readout" aria-live="polite"><span>当前虚报率 <strong id="roc-fa">--</strong></span><span>当前命中率 <strong id="roc-hit">--</strong></span></div>
+          </section>
+
+          <section class="report-section payoff-lab" aria-labelledby="payoff-title">
+            <div class="report-section-heading">
+              <div><span>05</span><h3 id="payoff-title">先验概率与错误代价</h3></div>
+              <small id="payoff-scenario-label">常规批放行</small>
+            </div>
+            <p class="distribution-intro">现实中的异常比例和错误后果会改变最优判断标准，但不会直接改变辨别能力 d′。</p>
+            <div class="scenario-strategy-note" id="scenario-strategy-note">普通批次中偏暗样本不常见，漏检和误拦都需要控制。</div>
+            <label class="prior-control" for="prior-signal"><span>预计偏暗率 P(S)</span><output id="prior-value">20%</output></label>
+            <input id="prior-signal" type="range" min="0.05" max="0.95" step="0.05" value="0.2" />
+            <div class="payoff-matrix" aria-label="结果价值矩阵">
+              <label><span>命中收益 V(H)</span><input id="payoff-hit" type="number" value="8" step="1" /></label>
+              <label><span>漏检结果 V(M)</span><input id="payoff-miss" type="number" value="-12" step="1" /></label>
+              <label><span>误拦结果 V(FA)</span><input id="payoff-fa" type="number" value="-4" step="1" /></label>
+              <label><span>正确放行 V(CR)</span><input id="payoff-cr" type="number" value="3" step="1" /></label>
+            </div>
+            <div class="optimal-strategy" aria-live="polite">
+              <div><span>最优 β</span><strong id="optimal-beta">--</strong></div>
+              <div><span>建议 c</span><strong id="optimal-criterion">--</strong></div>
+              <p id="optimal-copy">调整参数后生成策略建议。</p>
+            </div>
+            <button id="apply-optimal" class="compact-button" type="button">把建议 c 应用到图中</button>
+          </section>
+        </div>
+
+        <section class="report-section history-lab" aria-labelledby="history-title">
+          <div class="report-section-heading">
+            <div><span>06</span><h3 id="history-title">最近成绩对比</h3></div>
+            <button id="clear-history" class="compact-button" type="button">清除本机记录</button>
+          </div>
+          <p class="distribution-intro">这里只保存每轮汇总结果，用来比较练习趋势；不会保存逐次颜色、作答时间或身份信息。</p>
+          <div class="history-summary" id="history-summary" aria-live="polite">完成两轮后，这里会显示变化趋势。</div>
+          <div class="history-chart-wrap">
+            <canvas id="history-canvas" width="1100" height="340" aria-label="最近五轮准确率和玩家估计敏感性变化图"></canvas>
+          </div>
+          <div class="history-table-wrap">
+            <table class="history-table">
+              <thead><tr><th>轮次</th><th>任务情景</th><th>模型 d′</th><th>玩家 d′</th><th>准确率</th><th>标准 c</th></tr></thead>
+              <tbody id="history-table-body"><tr><td colspan="6">还没有可比较的历史记录</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="parameter-strip" aria-label="本轮实验参数">
+          <div><span>任务情景</span><strong id="report-scenario">--</strong></div>
+          <div><span>模型设置 d′</span><strong id="report-model-dprime">--</strong></div>
+          <div><span>观察时长</span><strong>1500 ms</strong></div>
+          <div><span>样本构成</span><strong>10 正常 · 10 异常</strong></div>
+        </section>
+
+        <footer class="report-actions">
+          <p>模型设置值描述刺激生成难度；玩家估计值来自本轮实际作答，两者含义不同。</p>
+          <button id="restart-from-report" class="flow-primary" type="button">重新开始一轮</button>
+        </footer>
+      </article>
+    </section>
+  </body>
+</html>
