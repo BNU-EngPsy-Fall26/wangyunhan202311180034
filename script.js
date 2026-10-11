@@ -73,6 +73,9 @@ const state = {
   batchId: "",
   workOrder: "",
   history: [],
+  passCount: 0,
+  holdCount: 0,
+  leverDragging: false,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -112,6 +115,14 @@ const elements = {
   distributionCanvas: $("#distribution-canvas"),
   rocCanvas: $("#roc-canvas"),
   historyCanvas: $("#history-canvas"),
+  sampleTray: $("#sample-tray"),
+  comparisonStage: $("#comparison-stage"),
+  sortingLever: $("#sorting-lever"),
+  leverTrack: $("#lever-track"),
+  passCount: $("#pass-count"),
+  holdCount: $("#hold-count"),
+  routeToken: $("#route-token"),
+  supervisorFeedback: $("#supervisor-feedback"),
 };
 
 function randomBetween(min, max) {
@@ -250,6 +261,7 @@ function setAnswersEnabled(enabled) {
   $$(".decision-button").forEach((button) => {
     button.disabled = !enabled;
   });
+  elements.sortingLever.disabled = !enabled;
 }
 
 function clearFeedback() {
@@ -259,6 +271,58 @@ function clearFeedback() {
   elements.feedbackTitle.textContent = "请观察两侧试色";
   elements.feedbackCopy.textContent = "待检试色被遮住后，判断按钮才会开放。";
   elements.nextPractice.classList.add("is-hidden");
+  setLeverPosition(0);
+}
+
+function setLeverPosition(value) {
+  const normalized = clamp(value, -1, 1);
+  const trackWidth = elements.leverTrack?.clientWidth || 280;
+  const knobWidth = elements.sortingLever?.offsetWidth || 74;
+  const travel = Math.max(0, (trackWidth - knobWidth) / 2 - 6);
+  elements.sortingLever.style.transform = `translateX(${normalized * travel}px)`;
+  elements.sortingLever.setAttribute("aria-valuenow", String(Math.round(normalized)));
+  elements.sortingLever.setAttribute("aria-valuetext", normalized <= -0.55 ? "放行" : normalized >= 0.55 ? "拦截" : "中央待命");
+}
+
+function renderSampleTray(completed = false) {
+  if (!elements.sampleTray) return;
+  if (state.mode !== "practice" && state.mode !== "formal") {
+    elements.sampleTray.replaceChildren();
+    return;
+  }
+  const total = state.mode === "practice" ? 4 : 20;
+  const done = Math.min(total, state.trialIndex + (completed ? 1 : 0));
+  const fragment = document.createDocumentFragment();
+  for (let index = 0; index < total; index += 1) {
+    const sample = document.createElement("span");
+    sample.className = "tray-sample";
+    sample.classList.toggle("is-complete", index < done);
+    sample.classList.toggle("is-current", index === state.trialIndex && !completed);
+    sample.title = `第 ${index + 1} 支${index < done ? "（已检）" : index === state.trialIndex && !completed ? "（当前）" : "（待检）"}`;
+    fragment.append(sample);
+  }
+  elements.sampleTray.replaceChildren(fragment);
+}
+
+function updateRouteCounters() {
+  elements.passCount.textContent = String(state.passCount);
+  elements.holdCount.textContent = String(state.holdCount);
+}
+
+function resetGameHardware() {
+  state.passCount = 0;
+  state.holdCount = 0;
+  state.leverDragging = false;
+  updateRouteCounters();
+  setLeverPosition(0);
+  elements.routeToken.classList.remove("to-pass", "to-hold");
+  renderSampleTray();
+}
+
+function animateRoute(response) {
+  elements.routeToken.classList.remove("to-pass", "to-hold");
+  void elements.routeToken.offsetWidth;
+  elements.routeToken.classList.add(response === "normal" ? "to-pass" : "to-hold");
 }
 
 function difficultyLabel(dPrime) {
@@ -333,6 +397,7 @@ function cancelTimer() {
   }
   state.runToken += 1;
   elements.observationStrip.classList.remove("is-observing");
+  elements.comparisonStage.classList.remove("is-scanning");
 }
 
 function schedule(duration, callback) {
@@ -354,6 +419,7 @@ function updateProgress(completed = false) {
   elements.progressFill.style.width = `${(current / total) * 100}%`;
   elements.progressCount.textContent = `${current} / ${total}`;
   elements.progressFill.parentElement.setAttribute("aria-label", `${state.mode === "practice" ? "练习" : "正式检测"}进度 ${current}/${total}`);
+  renderSampleTray(completed);
 }
 
 function runCurrentTrial(isReplay = false) {
@@ -376,6 +442,12 @@ function runCurrentTrial(isReplay = false) {
   elements.previewStatus.textContent = "准备 500 ms";
   setMask(true, "即将显示", "请注视比较区");
   updateProgress(false);
+  beginTimedTrial();
+}
+
+function beginTimedTrial() {
+  if (state.phase !== "prepare") return;
+  const isPractice = state.mode === "practice";
   schedule(timings.prepare, () => {
     state.phase = "observe";
     state.trialPresentedAt = Date.now();
@@ -384,10 +456,14 @@ function runCurrentTrial(isReplay = false) {
     elements.observationStrip.classList.remove("is-observing");
     void elements.observationStrip.offsetWidth;
     elements.observationStrip.classList.add("is-observing");
+    elements.comparisonStage.classList.remove("is-scanning");
+    void elements.comparisonStage.offsetWidth;
+    elements.comparisonStage.classList.add("is-scanning");
     schedule(timings.observe, () => {
       state.phase = "answer";
       state.answerOpenedAt = Date.now();
       elements.observationStrip.classList.remove("is-observing");
+      elements.comparisonStage.classList.remove("is-scanning");
       elements.previewStatus.textContent = "等待判断";
       setMask(true, "观察结束", "请选择色差判断");
       setAnswersEnabled(true);
@@ -406,6 +482,7 @@ function outcomeFor(truth, response) {
 
 function recordAnswer(response) {
   if (state.phase !== "answer" || state.answerLocked) return;
+  setLeverPosition(response === "normal" ? -1 : 1);
   setAnswersEnabled(false);
   state.phase = "feedback";
   const now = Date.now();
@@ -428,6 +505,10 @@ function recordAnswer(response) {
   };
   const records = state.mode === "practice" ? state.practiceRecords : state.formalRecords;
   if (!records.some((item) => item.trialId === record.trialId)) records.push(record);
+  if (response === "normal") state.passCount += 1;
+  else state.holdCount += 1;
+  updateRouteCounters();
+  animateRoute(response);
   $$(".decision-button").forEach((button) => button.classList.toggle("is-selected", button.dataset.answer === response));
   updateProgress(true);
   if (state.mode === "practice") {
@@ -911,6 +992,33 @@ function restoreObservedDistribution() {
   drawDistributionLab();
 }
 
+function recommendedBatchDecision(statistics) {
+  if (statistics.counts.miss >= 3 || (state.scenario === "rework" && statistics.counts.miss > 0)) return "pause";
+  if (statistics.counts.miss > 0 || statistics.counts.falseAlarm >= 4 || statistics.dPrime < 0.5) return "sample";
+  return "release";
+}
+
+function resetSupervisorDecision() {
+  $$("[data-batch-decision]").forEach((button) => button.classList.remove("is-selected", "is-recommended"));
+  elements.supervisorFeedback.className = "supervisor-feedback";
+  elements.supervisorFeedback.innerHTML = "<strong>等待你的批次决定</strong><span>先结合漏检、误拦和情景风险，再选择处理方式。</span>";
+}
+
+function handleBatchDecision(decision) {
+  if (!state.reportStatistics) return;
+  const recommended = recommendedBatchDecision(state.reportStatistics);
+  const labels = { release: "继续包装", sample: "扩大抽检", pause: "暂停并复测" };
+  $$("[data-batch-decision]").forEach((button) => {
+    button.classList.toggle("is-selected", button.dataset.batchDecision === decision);
+    button.classList.toggle("is-recommended", button.dataset.batchDecision === recommended);
+  });
+  const matched = decision === recommended;
+  elements.supervisorFeedback.className = `supervisor-feedback ${matched ? "is-good" : "is-warning"}`;
+  elements.supervisorFeedback.innerHTML = matched
+    ? `<strong>决策有依据：${labels[decision]}</strong><span>这一选择与本轮数据和“${scenarioConfig[state.scenario].label}”的风险重点一致。</span>`
+    : `<strong>还可以再权衡</strong><span>系统建议优先考虑“${labels[recommended]}”。本轮有 ${state.reportStatistics.counts.miss} 次漏检、${state.reportStatistics.counts.falseAlarm} 次误拦；这只是教学建议，不改变实验统计。</span>`;
+}
+
 function renderReport(statistics) {
   state.reportStatistics = statistics;
   $("#report-valid-count").textContent = `${statistics.total} / 20`;
@@ -931,6 +1039,7 @@ function renderReport(statistics) {
   $("#report-model-dprime").textContent = state.modelDPrime.toFixed(1);
   $("#viz-dprime").value = String(clamp(statistics.dPrime, -1.5, 3.5));
   $("#viz-criterion").value = String(clamp(statistics.criterion, -1.5, 1.5));
+  resetSupervisorDecision();
 }
 
 function advancePractice() {
@@ -997,6 +1106,7 @@ function startPractice() {
   state.practiceRecords = [];
   state.formalRecords = [];
   prepareTrialQueues();
+  resetGameHardware();
   setDifficultyControlsLocked(true);
   elements.introOverlay.classList.remove("is-visible");
   runCurrentTrial();
@@ -1008,6 +1118,7 @@ function startFormal() {
   state.phase = "idle";
   state.trialIndex = 0;
   state.formalRecords = [];
+  resetGameHardware();
   elements.messageOverlay.classList.remove("is-visible");
   runCurrentTrial();
 }
@@ -1021,6 +1132,7 @@ function resetExperiment() {
   state.practiceRecords = [];
   state.formalRecords = [];
   state.reportStatistics = null;
+  resetGameHardware();
   createSessionIdentifiers();
   document.body.dataset.running = "false";
   elements.messageOverlay.classList.remove("is-visible");
@@ -1039,6 +1151,7 @@ function resetExperiment() {
   clearFeedback();
   elements.feedbackTitle.textContent = "请先阅读教学说明";
   elements.feedbackCopy.textContent = "完成 4 次练习后，将进入 20 次正式检测。";
+  resetSupervisorDecision();
 }
 
 function interruptTimedTrial() {
@@ -1100,6 +1213,51 @@ elements.messageAction.addEventListener("click", () => {
   else resetExperiment();
 });
 $$(".decision-button").forEach((button) => button.addEventListener("click", () => recordAnswer(button.dataset.answer)));
+
+function updateLeverFromPointer(clientX) {
+  const rect = elements.leverTrack.getBoundingClientRect();
+  const normalized = clamp((clientX - (rect.left + rect.width / 2)) / (rect.width * 0.36), -1, 1);
+  setLeverPosition(normalized);
+  return normalized;
+}
+
+elements.sortingLever.addEventListener("pointerdown", (event) => {
+  if (elements.sortingLever.disabled) return;
+  state.leverDragging = true;
+  elements.sortingLever.classList.add("is-dragging");
+  elements.sortingLever.setPointerCapture(event.pointerId);
+  updateLeverFromPointer(event.clientX);
+  event.preventDefault();
+});
+elements.sortingLever.addEventListener("pointermove", (event) => {
+  if (!state.leverDragging) return;
+  updateLeverFromPointer(event.clientX);
+});
+elements.sortingLever.addEventListener("pointerup", (event) => {
+  if (!state.leverDragging) return;
+  const value = updateLeverFromPointer(event.clientX);
+  state.leverDragging = false;
+  elements.sortingLever.classList.remove("is-dragging");
+  if (value <= -0.55) recordAnswer("normal");
+  else if (value >= 0.55) recordAnswer("abnormal");
+  else setLeverPosition(0);
+});
+elements.sortingLever.addEventListener("pointercancel", () => {
+  state.leverDragging = false;
+  elements.sortingLever.classList.remove("is-dragging");
+  setLeverPosition(0);
+});
+elements.sortingLever.addEventListener("keydown", (event) => {
+  if (elements.sortingLever.disabled) return;
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    recordAnswer("normal");
+  } else if (event.key === "ArrowRight") {
+    event.preventDefault();
+    recordAnswer("abnormal");
+  }
+});
+$$("[data-batch-decision]").forEach((button) => button.addEventListener("click", () => handleBatchDecision(button.dataset.batchDecision)));
 window.addEventListener("blur", interruptTimedTrial);
 document.addEventListener("visibilitychange", interruptTimedTrial);
 window.addEventListener("resize", drawAll);
@@ -1192,6 +1350,8 @@ loadHistory();
 generateStimulus("normal");
 drawLessonExamples();
 setAnswersEnabled(false);
+resetGameHardware();
+resetSupervisorDecision();
 elements.progressFill.parentElement.setAttribute("aria-label", "实验进度 0/20");
 updateClock();
 setInterval(updateClock, 1000);

@@ -115,7 +115,19 @@
           </div>
         </div>
 
-        <div class="comparison-stage">
+        <div class="production-flow" aria-label="样品流转工作台">
+          <section class="sample-tray-panel" aria-labelledby="tray-title">
+            <div><span>待检托盘</span><strong id="tray-title">本轮样品</strong></div>
+            <div class="sample-tray" id="sample-tray" aria-label="待检样品托盘"></div>
+          </section>
+          <section class="route-bins" aria-label="分流结果">
+            <div class="route-bin pass-bin"><span>包装线</span><strong id="pass-count">0</strong><small>已放行</small></div>
+            <div class="route-bin hold-bin"><span>复检箱</span><strong id="hold-count">0</strong><small>已拦截</small></div>
+            <span id="route-token" class="route-token" aria-hidden="true"></span>
+          </section>
+        </div>
+
+        <div class="comparison-stage" id="comparison-stage">
           <article class="swatch-station">
             <div class="station-label">
               <span>A</span>
@@ -155,6 +167,7 @@
               <span class="corner-mark bottom-right" aria-hidden="true"></span>
             </div>
           </article>
+          <span class="scan-beam" aria-hidden="true"></span>
         </div>
 
         <div class="observation-strip">
@@ -176,7 +189,15 @@
           <p id="decision-instruction">观察结束后才能提交判断。练习会显示答案，正式检测不会即时反馈。</p>
         </div>
 
-        <div class="decision-buttons" role="group" aria-label="样本判断">
+        <div class="sorting-console" aria-label="分流拨杆控制台">
+          <div class="lever-labels"><span>← 放行</span><strong>拖动分流拨杆</strong><span>拦截 →</span></div>
+          <div class="lever-track" id="lever-track">
+            <button id="sorting-lever" class="sorting-lever" type="button" role="slider" aria-label="样品分流拨杆" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" aria-valuetext="中央待命" disabled><span></span></button>
+          </div>
+          <small>向左拖到底放行，向右拖到底拦截；也可使用方向键。</small>
+        </div>
+
+        <div class="decision-buttons quick-decision-buttons" role="group" aria-label="样本判断快捷按钮">
           <button type="button" class="decision-button normal" data-answer="normal">
             <span class="decision-icon" aria-hidden="true">✓</span>
             <span>
@@ -427,6 +448,20 @@
               <tbody id="history-table-body"><tr><td colspan="6">还没有可比较的历史记录</td></tr></tbody>
             </table>
           </div>
+        </section>
+
+        <section class="report-section supervisor-lab" aria-labelledby="supervisor-title">
+          <div class="report-section-heading">
+            <div><span>07</span><h3 id="supervisor-title">主管最终决策</h3></div>
+            <small>根据本轮结果处理整批产品</small>
+          </div>
+          <p class="distribution-intro">现在你不再判断单支样品，而是以质量主管身份决定整批产品下一步怎么处理。</p>
+          <div class="supervisor-controls" role="group" aria-label="批次处理决定">
+            <button type="button" data-batch-decision="release"><span aria-hidden="true">▶</span><strong>继续包装</strong><small>允许本批进入下一工序</small></button>
+            <button type="button" data-batch-decision="sample"><span aria-hidden="true">＋</span><strong>扩大抽检</strong><small>增加样品后再决定</small></button>
+            <button type="button" data-batch-decision="pause"><span aria-hidden="true">Ⅱ</span><strong>暂停并复测</strong><small>停止包装，交仪器确认</small></button>
+          </div>
+          <div id="supervisor-feedback" class="supervisor-feedback" aria-live="polite">选择一个处理方案，系统会结合漏检、误拦和当前情景给出建议。</div>
         </section>
 
         <section class="parameter-strip" aria-label="本轮实验参数">
